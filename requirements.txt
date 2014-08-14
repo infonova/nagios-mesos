@@ -1,0 +1,4 @@
+nagiosplugin==1.2.2
+setuptools>=3.4.0
+pip>=1.4
+pep8==1.2

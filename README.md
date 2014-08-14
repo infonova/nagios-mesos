@@ -1,4 +1,4 @@
-otpl-mesos-nagios-checks
-========================
+nagios-mesos
+============
 
-Nagios checks for Mesos clusters
+Basic Nagios checks for Mesos cluster
