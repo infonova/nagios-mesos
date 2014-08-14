@@ -26,7 +26,7 @@ class MesosMaster(nagiosplugin.Resource):
     self.frameworks = frameworks
 
   def probe(self):
-    logging.debug('Base URI is %s', self.baseuri)
+    logging.info('Base URI is %s', self.baseuri)
     try:
       response = urlopen(self.baseuri + '/health')
       logging.debug('Response from %s is %s', response.geturl(), response)
@@ -73,6 +73,8 @@ def main():
                     help='The minimum number of slaves the cluster must be running')
   argp.add_argument('-F', '--framework', default=[], action='append',
                     help='Check that a framework is registered matching the given regex, may be specified multiple times')
+  argp.add_argument('-v', '--verbose', action='count', default=0,
+                    help='increase output verbosity (use up to 3 times)')
   
   args = argp.parse_args()
   
@@ -85,7 +87,7 @@ def main():
               nagiosplugin.ScalarContext('active slaves', slave_range, slave_range),
               nagiosplugin.ScalarContext('active leader', '1:1', '1:1'),
               nagiosplugin.ScalarContext('framework', '0:0', '0:0'))
-  check.main()
+  check.main(verbose=args.verbose)
 
 if __name__ == '__main__':
   main()
