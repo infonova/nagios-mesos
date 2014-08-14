@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import nagiosplugin
-import urllib2
 import argparse
 import logging
 import re
