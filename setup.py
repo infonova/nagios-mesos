@@ -9,7 +9,7 @@ setup(
     name="nagios-mesos",
     description="A selection of Nagios plugins to monitor Apache Mesos.",
     long_description=open('README.rst').read(),
-    version="0.1.0",
+    version="0.2.0",
     packages=find_packages(),
     author='Steven Schlansker',
     author_email='sschlansker@opentable.com',
