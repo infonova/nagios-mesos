@@ -23,7 +23,7 @@ class MesosMaster(nagiosplugin.Resource):
       if response.status_code != 307:
         yield nagiosplugin.Metric('master redirect', UNHEALTHY)
       master_uri = response.headers['Location']
-      yield nagiosplugin.Metric('master redirect', HEALTHY)
+      # yield the master redirect later, the summary takes the first check which we want to be 'master health'
     except requests.exceptions.RequestException, e:
       logging.error('master redirect %s', e)
       yield nagiosplugin.Metric('master redirect', UNHEALTHY)
@@ -46,6 +46,9 @@ class MesosMaster(nagiosplugin.Resource):
 
     yield nagiosplugin.Metric('active slaves', state['activated_slaves'])
     yield nagiosplugin.Metric('active leader', 1 if has_leader else 0)
+
+    # now we can yield the redirect status, from above
+    yield nagiosplugin.Metric('master redirect', HEALTHY)
 
     for framework_regex in self.frameworks:
       framework = None
