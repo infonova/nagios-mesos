@@ -3,21 +3,11 @@ import nagiosplugin
 import argparse
 import logging
 import re
+import requests
 
 INFINITY = float('inf')
 HEALTHY = 1
 UNHEALTHY = -1
-
-try:
-  from urllib2 import *
-except ImportError:
-  from urllib.request import *
-  from urllib.error import HTTPError
-
-try:
-  import json
-except ImportError:
-  import simplejson as json
 
 class MesosMaster(nagiosplugin.Resource):
   def __init__(self, baseuri, frameworks):
@@ -26,23 +16,20 @@ class MesosMaster(nagiosplugin.Resource):
 
   def probe(self):
     logging.info('Base URI is %s', self.baseuri)
-    try:
-      response = urlopen(self.baseuri + '/health')
-      logging.debug('Response from %s is %s', response.geturl(), response)
-      if response.getcode() in [200, 204]:
-        yield nagiosplugin.Metric('master health', HEALTHY)
-      else:
-        yield nagiosplugin.Metric('master health', UNHEALTHY)
-    except HTTPError, e:
-      logging.debug('HTTP error %s', e)
+
+    response = requests.get(self.baseuri + '/health')
+    logging.debug('Response from %s is %s', response.request.url, response)
+    if response.status_code in [200, 204]:
+      yield nagiosplugin.Metric('master health', HEALTHY)
+    else:
       yield nagiosplugin.Metric('master health', UNHEALTHY)
-    
-    response = urlopen(self.baseuri + '/master/state.json')
-    logging.debug('Response from %s is %s', response.geturl(), response)
-    state = json.load(response)
-    
+
+    response = requests.get(self.baseuri + '/master/state.json')
+    logging.debug('Response from %s is %s', response.request.url, response)
+    state = response.json()
+
     has_leader = len(state.get('leader', '')) > 0
-    
+
     yield nagiosplugin.Metric('active slaves', state['activated_slaves'])
     yield nagiosplugin.Metric('active leader', 1 if has_leader else 0)
 
@@ -51,15 +38,15 @@ class MesosMaster(nagiosplugin.Resource):
       for candidate in state['frameworks']:
         if re.search(framework_regex, candidate['name']) is not None:
           framework = candidate
-      
+
       unregistered_time = INFINITY
-      
+
       if framework is not None:
         unregistered_time = framework['unregistered_time']
         if not framework['active'] and unregistered_time == 0:
           unregistered_time = INFINITY
       yield nagiosplugin.Metric('framework ' + framework_regex, unregistered_time, context='framework')
-      
+
 
 @nagiosplugin.guarded
 def main():
@@ -74,12 +61,12 @@ def main():
                     help='Check that a framework is registered matching the given regex, may be specified multiple times')
   argp.add_argument('-v', '--verbose', action='count', default=0,
                     help='increase output verbosity (use up to 3 times)')
-  
+
   args = argp.parse_args()
-  
+
   unhealthy_range = nagiosplugin.Range('%d:%d' % (HEALTHY - 1, HEALTHY + 1))
   slave_range = nagiosplugin.Range('%s:' % (args.slaves,))
-  
+
   check = nagiosplugin.Check(
               MesosMaster('http://%s:%d' % (args.host, args.port), args.framework),
               nagiosplugin.ScalarContext('master health', unhealthy_range, unhealthy_range),
