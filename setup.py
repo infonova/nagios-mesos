@@ -17,5 +17,13 @@ setup(
     scripts=["check_mesos.py"],
     license="Apache 2",
     install_requires=parse_requirements("requirements.txt"),
-    include_package_data=True
+    include_package_data=True,
+    classifiers=[
+      'Development Status :: 4 - Beta',
+      'Environment :: Console',
+      'Intended Audience :: System Administrators',
+      'License :: OSI Approved :: Apache Software License',
+      'Topic :: System :: Monitoring',
+      'Topic :: System :: Networking :: Monitoring'
+    ]
 )
