@@ -9,6 +9,8 @@ INFINITY = float('inf')
 HEALTHY = 1
 UNHEALTHY = -1
 
+log = logging.getLogger("nagiosplugin")
+
 class MesosMaster(nagiosplugin.Resource):
   def __init__(self, baseuri, frameworks):
     self.baseuri = baseuri
@@ -16,7 +18,7 @@ class MesosMaster(nagiosplugin.Resource):
 
   def probe(self):
     master_uri=self.baseuri
-    logging.info('Looking at %s for redirect', master_uri)
+    log.info('Looking at %s for redirect', master_uri)
 
     try:
       response = requests.head(master_uri + '/master/redirect')
@@ -25,21 +27,21 @@ class MesosMaster(nagiosplugin.Resource):
       master_uri = response.headers['Location']
       # yield the master redirect later, the summary takes the first check which we want to be 'master health'
     except requests.exceptions.RequestException, e:
-      logging.error('master redirect %s', e)
+      log.error('master redirect %s', e)
       yield nagiosplugin.Metric('master redirect', UNHEALTHY)
       return
 
-    logging.info('Base URI is redirected to %s', master_uri)
+    log.info('Base URI is redirected to %s', master_uri)
 
     response = requests.get(master_uri + '/health')
-    logging.debug('Response from %s is %s', response.request.url, response)
+    log.debug('Response from %s is %s', response.request.url, response)
     if response.status_code in [200, 204]:
       yield nagiosplugin.Metric('master health', HEALTHY)
     else:
       yield nagiosplugin.Metric('master health', UNHEALTHY)
 
     response = requests.get(master_uri + '/master/state.json')
-    logging.debug('Response from %s is %s', response.request.url, response)
+    log.debug('Response from %s is %s', response.request.url, response)
     state = response.json()
 
     has_leader = len(state.get('leader', '')) > 0
