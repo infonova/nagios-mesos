@@ -18,30 +18,31 @@ class MesosMaster(nagiosplugin.Resource):
 
   def probe(self):
     master_uri=self.baseuri
-    log.info('Looking at %s for redirect', master_uri)
+    log.debug('Looking at %s for redirect', master_uri)
 
     try:
       response = requests.head(master_uri + '/master/redirect')
       if response.status_code != 307:
         yield nagiosplugin.Metric('master redirect', UNHEALTHY)
       master_uri = response.headers['Location']
+      log.info('Redirect response is %s', response)
       # yield the master redirect later, the summary takes the first check which we want to be 'master health'
     except requests.exceptions.RequestException, e:
       log.error('master redirect %s', e)
       yield nagiosplugin.Metric('master redirect', UNHEALTHY)
       return
 
-    log.info('Base URI is redirected to %s', master_uri)
+    log.debug('Base URI is redirected to %s', master_uri)
 
     response = requests.get(master_uri + '/health')
-    log.debug('Response from %s is %s', response.request.url, response)
+    log.info('Response from %s is %s', response.request.url, response)
     if response.status_code in [200, 204]:
       yield nagiosplugin.Metric('master health', HEALTHY)
     else:
       yield nagiosplugin.Metric('master health', UNHEALTHY)
 
     response = requests.get(master_uri + '/master/state.json')
-    log.debug('Response from %s is %s', response.request.url, response)
+    log.info('Response from %s is %s', response.request.url, response)
     state = response.json()
 
     has_leader = len(state.get('leader', '')) > 0
