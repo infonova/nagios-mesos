@@ -23,13 +23,13 @@ class MesosMaster(nagiosplugin.Resource):
     try:
       response = requests.head(master_uri + '/master/redirect')
       if response.status_code != 307:
-        yield nagiosplugin.Metric('master redirect', UNHEALTHY)
+        yield nagiosplugin.Metric('leader redirect', UNHEALTHY)
       master_uri = response.headers['Location']
       log.info('Redirect response is %s', response)
-      # yield the master redirect later, the summary takes the first check which we want to be 'master health'
+      # yield the leader redirect later, the summary takes the first check which we want to be 'master health'
     except requests.exceptions.RequestException, e:
-      log.error('master redirect %s', e)
-      yield nagiosplugin.Metric('master redirect', UNHEALTHY)
+      log.error('leader redirect %s', e)
+      yield nagiosplugin.Metric('leader redirect', UNHEALTHY)
       return
 
     log.debug('Base URI is redirected to %s', master_uri)
@@ -51,7 +51,7 @@ class MesosMaster(nagiosplugin.Resource):
     yield nagiosplugin.Metric('active leader', 1 if has_leader else 0)
 
     # now we can yield the redirect status, from above
-    yield nagiosplugin.Metric('master redirect', HEALTHY)
+    yield nagiosplugin.Metric('leader redirect', HEALTHY)
 
     for framework_regex in self.frameworks:
       framework = None
@@ -89,7 +89,7 @@ def main():
 
   check = nagiosplugin.Check(
               MesosMaster('http://%s:%d' % (args.host, args.port), args.framework),
-              nagiosplugin.ScalarContext('master redirect', unhealthy_range, unhealthy_range),
+              nagiosplugin.ScalarContext('leader redirect', unhealthy_range, unhealthy_range),
               nagiosplugin.ScalarContext('master health', unhealthy_range, unhealthy_range),
               nagiosplugin.ScalarContext('active slaves', slave_range, slave_range),
               nagiosplugin.ScalarContext('active leader', '1:1', '1:1'),
