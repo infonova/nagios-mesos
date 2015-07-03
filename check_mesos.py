@@ -88,7 +88,7 @@ def main():
   slave_range = nagiosplugin.Range('%s:' % (args.slaves,))
 
   check = nagiosplugin.Check(
-              MesosMaster('http://%s:%d' % (args.host, args.port), args.framework),
+              MesosMaster('http://%s:%d' % (args.host, int(args.port)), args.framework),
               nagiosplugin.ScalarContext('leader redirect', unhealthy_range, unhealthy_range),
               nagiosplugin.ScalarContext('master health', unhealthy_range, unhealthy_range),
               nagiosplugin.ScalarContext('active slaves', slave_range, slave_range),
