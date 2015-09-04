@@ -4,6 +4,7 @@ import argparse
 import logging
 import re
 import requests
+from urlparse import urlparse
 
 INFINITY = float('inf')
 HEALTHY = 1
@@ -16,6 +17,14 @@ class MesosMaster(nagiosplugin.Resource):
     self.baseuri = baseuri
     self.frameworks = frameworks
 
+  def build_redirection(self, master_uri, location):
+    original = urlparse(master_uri)
+    redirect = urlparse(location)
+    if redirect.scheme == '':
+      return original.scheme + ':' + location
+    else: # version <0.23
+      return location
+
   def probe(self):
     master_uri=self.baseuri
     log.debug('Looking at %s for redirect', master_uri)
@@ -24,8 +33,8 @@ class MesosMaster(nagiosplugin.Resource):
       response = requests.head(master_uri + '/master/redirect', timeout=5)
       if response.status_code != 307:
         yield nagiosplugin.Metric('leader redirect', UNHEALTHY)
-      master_uri = response.headers['Location']
       log.info('Redirect response is %s', response)
+      master_uri = self.build_redirection(master_uri, response.headers['Location'])
       # yield the leader redirect later, the summary takes the first check which we want to be 'master health'
     except requests.exceptions.RequestException, e:
       log.error('leader redirect %s', e)
