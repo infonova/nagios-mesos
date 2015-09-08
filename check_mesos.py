@@ -30,7 +30,7 @@ class MesosMaster(nagiosplugin.Resource):
     log.debug('Looking at %s for redirect', master_uri)
 
     try:
-      response = requests.head(master_uri + '/master/redirect', timeout=5)
+      response = requests.head(master_uri + '/master/redirect', timeout=5, allow_redirects=False)
       if response.status_code != 307:
         yield nagiosplugin.Metric('leader redirect', UNHEALTHY)
       log.info('Redirect response is %s', response)
