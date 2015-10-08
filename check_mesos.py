@@ -52,6 +52,8 @@ class MesosMaster(nagiosplugin.Resource):
 
     response = requests.get(master_uri + '/master/state.json', timeout=5)
     log.info('Response from %s is %s', response.request.url, response)
+    if response.encoding is None:
+      response.encoding = "UTF8"
     state = response.json()
 
     has_leader = len(state.get('leader', '')) > 0
