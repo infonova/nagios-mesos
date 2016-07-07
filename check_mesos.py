@@ -12,9 +12,12 @@ UNHEALTHY = -1
 
 log = logging.getLogger("nagiosplugin")
 
+
 class MesosMaster(nagiosplugin.Resource):
-  def __init__(self, baseuri, frameworks):
-    self.baseuri = baseuri
+  def __init__(self, host, port, frameworks):
+    parsed_host = urlparse(host)
+    host = host if parsed_host.scheme else 'http://' + host
+    self.baseuri = '%s:%d' % (host, port)
     self.frameworks = frameworks
 
   def build_redirection(self, master_uri, location):
@@ -99,7 +102,7 @@ def main():
   slave_range = nagiosplugin.Range('%s:' % (args.slaves,))
 
   check = nagiosplugin.Check(
-              MesosMaster('http://%s:%d' % (args.host, int(args.port)), args.framework),
+              MesosMaster(args.host, args.port, args.framework),
               nagiosplugin.ScalarContext('leader redirect', unhealthy_range, unhealthy_range),
               nagiosplugin.ScalarContext('master health', unhealthy_range, unhealthy_range),
               nagiosplugin.ScalarContext('active slaves', slave_range, slave_range),
