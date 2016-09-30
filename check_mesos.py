@@ -14,11 +14,13 @@ log = logging.getLogger("nagiosplugin")
 
 
 class MesosMaster(nagiosplugin.Resource):
-  def __init__(self, host, port, frameworks):
+  def __init__(self, host, port, username, password, frameworks):
     parsed_host = urlparse(host)
     host = host if parsed_host.scheme else 'http://' + host
     self.baseuri = '%s:%d' % (host, port)
     self.frameworks = frameworks
+    self.username = username
+    self.password = password
 
   def build_redirection(self, master_uri, location):
     original = urlparse(master_uri)
@@ -33,7 +35,10 @@ class MesosMaster(nagiosplugin.Resource):
     log.debug('Looking at %s for redirect', master_uri)
 
     try:
-      response = requests.head(master_uri + '/master/redirect', timeout=5, allow_redirects=False)
+      if self.username == "":
+        response = requests.head(master_uri + '/master/redirect', timeout=5, allow_redirects=False)
+      else:
+        response = requests.head(master_uri + '/master/redirect', timeout=5, allow_redirects=False, auth=(self.username, self.password))
       if response.status_code != 307:
         yield nagiosplugin.Metric('leader redirect', UNHEALTHY)
       log.info('Redirect response is %s', response)
@@ -46,14 +51,20 @@ class MesosMaster(nagiosplugin.Resource):
 
     log.debug('Base URI is redirected to %s', master_uri)
 
-    response = requests.get(master_uri + '/health', timeout=5)
+    if self.username == "":
+      response = requests.get(master_uri + '/health', timeout=5)
+    else:
+      response = requests.get(master_uri + '/health', timeout=5, auth=(self.username, self.password))
     log.info('Response from %s is %s', response.request.url, response)
     if response.status_code in [200, 204]:
       yield nagiosplugin.Metric('master health', HEALTHY)
     else:
       yield nagiosplugin.Metric('master health', UNHEALTHY)
 
-    response = requests.get(master_uri + '/master/state.json', timeout=5)
+    if self.username == "":
+      response = requests.get(master_uri + '/master/state.json', timeout=5)
+    else:
+      response = requests.get(master_uri + '/master/state.json', timeout=5, auth=(self.username, self.password))
     log.info('Response from %s is %s', response.request.url, response)
     if response.encoding is None:
       response.encoding = "UTF8"
@@ -89,6 +100,10 @@ def main():
                     help='The hostname of a Mesos master to check')
   argp.add_argument('-P', '--port', default=5050,
                     help='The Mesos master HTTP port - defaults to 5050')
+  argp.add_argument('-u', '--username', default="",
+                    help='The optional username if auth is enabled')
+  argp.add_argument('-p', '--password', default="",
+                    help='The optional password if auth is enabled')
   argp.add_argument('-n', '--slaves', default=1,
                     help='The minimum number of slaves the cluster must be running')
   argp.add_argument('-F', '--framework', default=[], action='append',
@@ -102,12 +117,12 @@ def main():
   slave_range = nagiosplugin.Range('%s:' % (args.slaves,))
 
   check = nagiosplugin.Check(
-              MesosMaster(args.host, args.port, args.framework),
-              nagiosplugin.ScalarContext('leader redirect', unhealthy_range, unhealthy_range),
-              nagiosplugin.ScalarContext('master health', unhealthy_range, unhealthy_range),
-              nagiosplugin.ScalarContext('active slaves', slave_range, slave_range),
-              nagiosplugin.ScalarContext('active leader', '1:1', '1:1'),
-              nagiosplugin.ScalarContext('framework', '0:0', '0:0'))
+    MesosMaster(args.host, args.port,args.username, args.password, args.framework),
+    nagiosplugin.ScalarContext('leader redirect', unhealthy_range, unhealthy_range),
+    nagiosplugin.ScalarContext('master health', unhealthy_range, unhealthy_range),
+    nagiosplugin.ScalarContext('active slaves', slave_range, slave_range),
+    nagiosplugin.ScalarContext('active leader', '1:1', '1:1'),
+    nagiosplugin.ScalarContext('framework', '0:0', '0:0'))
   check.main(verbose=args.verbose)
 
 if __name__ == '__main__':
