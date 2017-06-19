@@ -9,6 +9,7 @@ from urlparse import urlparse
 INFINITY = float('inf')
 HEALTHY = 1
 UNHEALTHY = -1
+REQUEST_TIMEOUT = 10
 
 log = logging.getLogger("nagiosplugin")
 
@@ -36,9 +37,9 @@ class MesosMaster(nagiosplugin.Resource):
 
     try:
       if self.username == "":
-        response = requests.head(master_uri + '/master/redirect', timeout=5, allow_redirects=False)
+        response = requests.head(master_uri + '/master/redirect', timeout=REQUEST_TIMEOUT, allow_redirects=False)
       else:
-        response = requests.head(master_uri + '/master/redirect', timeout=5, allow_redirects=False, auth=(self.username, self.password))
+        response = requests.head(master_uri + '/master/redirect', timeout=REQUEST_TIMEOUT, allow_redirects=False, auth=(self.username, self.password))
       if response.status_code != 307:
         yield nagiosplugin.Metric('leader redirect', UNHEALTHY)
       log.info('Redirect response is %s', response)
@@ -52,9 +53,9 @@ class MesosMaster(nagiosplugin.Resource):
     log.debug('Base URI is redirected to %s', master_uri)
 
     if self.username == "":
-      response = requests.get(master_uri + '/health', timeout=5)
+      response = requests.get(master_uri + '/health', timeout=REQUEST_TIMEOUT)
     else:
-      response = requests.get(master_uri + '/health', timeout=5, auth=(self.username, self.password))
+      response = requests.get(master_uri + '/health', timeout=REQUEST_TIMEOUT, auth=(self.username, self.password))
     log.info('Response from %s is %s', response.request.url, response)
     if response.status_code in [200, 204]:
       yield nagiosplugin.Metric('master health', HEALTHY)
@@ -62,36 +63,20 @@ class MesosMaster(nagiosplugin.Resource):
       yield nagiosplugin.Metric('master health', UNHEALTHY)
 
     if self.username == "":
-      response = requests.get(master_uri + '/master/state.json', timeout=5)
+      response = requests.get(master_uri + '/metrics/snapshot', timeout=REQUEST_TIMEOUT)
     else:
-      response = requests.get(master_uri + '/master/state.json', timeout=5, auth=(self.username, self.password))
+      response = requests.get(master_uri + '/metrics/snapshot', timeout=REQUEST_TIMEOUT, auth=(self.username, self.password))
     log.info('Response from %s is %s', response.request.url, response)
     if response.encoding is None:
       response.encoding = "UTF8"
     state = response.json()
 
-    has_leader = len(state.get('leader', '')) > 0
-
-    yield nagiosplugin.Metric('active slaves', state['activated_slaves'])
-    yield nagiosplugin.Metric('active leader', 1 if has_leader else 0)
+    yield nagiosplugin.Metric('active slaves', state['master/slaves_active'])
+    yield nagiosplugin.Metric('active leader', state['master/elected'])
+    yield nagiosplugin.Metric('active frameworks', state['master/frameworks_active'])
 
     # now we can yield the redirect status, from above
     yield nagiosplugin.Metric('leader redirect', HEALTHY)
-
-    for framework_regex in self.frameworks:
-      framework = None
-      for candidate in state['frameworks']:
-        if re.search(framework_regex, candidate['name']) is not None:
-          framework = candidate
-
-      unregistered_time = INFINITY
-
-      if framework is not None:
-        unregistered_time = framework['unregistered_time']
-        if not framework['active'] and unregistered_time == 0:
-          unregistered_time = INFINITY
-      yield nagiosplugin.Metric('framework ' + framework_regex, unregistered_time, context='framework')
-
 
 @nagiosplugin.guarded
 def main():
@@ -106,8 +91,8 @@ def main():
                     help='The optional password if auth is enabled')
   argp.add_argument('-n', '--slaves', default=1,
                     help='The minimum number of slaves the cluster must be running')
-  argp.add_argument('-F', '--framework', default=[], action='append',
-                    help='Check that a framework is registered matching the given regex, may be specified multiple times')
+  argp.add_argument('-F', '--frameworks', default=1,
+                    help='The minimum number of frameworks that must be active')
   argp.add_argument('-v', '--verbose', action='count', default=0,
                     help='increase output verbosity (use up to 3 times)')
 
@@ -115,14 +100,15 @@ def main():
 
   unhealthy_range = nagiosplugin.Range('%d:%d' % (HEALTHY - 1, HEALTHY + 1))
   slave_range = nagiosplugin.Range('%s:' % (args.slaves,))
+  framework_range = nagiosplugin.Range('%s:' % (args.frameworks,))
 
   check = nagiosplugin.Check(
-    MesosMaster(args.host, args.port,args.username, args.password, args.framework),
+    MesosMaster(args.host, args.port,args.username, args.password, args.frameworks),
     nagiosplugin.ScalarContext('leader redirect', unhealthy_range, unhealthy_range),
     nagiosplugin.ScalarContext('master health', unhealthy_range, unhealthy_range),
     nagiosplugin.ScalarContext('active slaves', slave_range, slave_range),
     nagiosplugin.ScalarContext('active leader', '1:1', '1:1'),
-    nagiosplugin.ScalarContext('framework', '0:0', '0:0'))
+    nagiosplugin.ScalarContext('active frameworks', framework_range, framework_range))
   check.main(verbose=args.verbose)
 
 if __name__ == '__main__':
